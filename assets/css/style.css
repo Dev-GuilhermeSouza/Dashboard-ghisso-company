@@ -116,7 +116,6 @@ tbody tr:hover {
 
 .btn-limpar {
   display: inline-block;
-  margin-bottom: 22px;
   padding: 16px;
   background: var(--primary);
   color: #ffffff;
@@ -256,3 +255,52 @@ tbody tr:hover {
 .card-verde { background-color: var(--green); }
 .card-amarelo { background-color: var(--yellow); }
 .card-vermelho { background-color: var(--red); }
+
+.container__table-icons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.busca-wrapper {
+  flex: 1;
+  max-width: 400px;
+}
+
+#campoBusca {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: border-color 0.3s ease;
+}
+
+#campoBusca:focus {
+  outline: none;
+  border-color: #42a5f5;
+  box-shadow: 0 0 0 2px rgba(66, 165, 245, 0.2);
+}
+
+th .seta {
+  font-size: 14px;
+  color: #888;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+th:hover .seta {
+  color: #000;
+  transform: scale(1.2);
+}
+
+body.dark th .seta {
+  color: #aaa;
+}
+
+body.dark th:hover .seta {
+  color: #fff;
+}
+

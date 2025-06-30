@@ -1,9 +1,17 @@
 Chart.register(ChartDataLabels);
 let grafico = null;
 let todasTarefas = [];
+let ultimoFiltro = "todos";
+let ultimaContagem = {};
+let ordemAtual = { coluna: null, crescente: true };
 
 function removerAcentos(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function parseDataBR(dataStr) {
+  const [dia, mes, ano] = dataStr.split("/");
+  return new Date(`${ano}-${mes}-${dia}`);
 }
 
 async function carregarTarefas() {
@@ -14,14 +22,21 @@ async function carregarTarefas() {
 
 function renderTarefas(filtro) {
   const tbody = document.getElementById("tabela-tarefas");
+  const termoBusca = document.getElementById("campoBusca")?.value?.toLowerCase().trim() || "";
   tbody.innerHTML = "";
 
   const tarefasFiltradas = todasTarefas.filter(t => {
     const status = removerAcentos(t.Status);
-    if (filtro === "pendente") return status === "pendente";
-    if (filtro === "concluido") return status === "concluido";
-    if (filtro === "emProgresso") return ["em pausa", "em refatoracao", "em aprovacao"].includes(status);
-    return true;
+    const nome = t.Tarefa?.toLowerCase() || "";
+
+    const statusOk =
+      filtro === "pendente" ? status === "pendente" :
+      filtro === "concluido" ? status === "concluido" :
+      filtro === "emProgresso" ? ["em pausa", "em refatoracao", "em aprovacao"].includes(status) :
+      true;
+
+    const buscaOk = nome.includes(termoBusca);
+    return statusOk && buscaOk;
   });
 
   const contagem = {
@@ -46,12 +61,11 @@ function renderTarefas(filtro) {
     if (contagem[status] !== undefined) contagem[status]++;
   });
 
-  // Atualiza os contadores
+  ultimaContagem = contagem;
+
   document.querySelector(".box.vermelho").textContent = contagem["pendente"];
   document.querySelector(".box.amarelo").textContent =
-    contagem["em refatoracao"] +
-    contagem["em aprovacao"] +
-    contagem["em pausa"];
+    contagem["em refatoracao"] + contagem["em aprovacao"] + contagem["em pausa"];
   document.querySelector(".box.verde").textContent = contagem["concluido"];
   document.querySelector(".total-tarefas").textContent = "Total de Tarefas: " + tarefasFiltradas.length;
 
@@ -61,6 +75,8 @@ function renderTarefas(filtro) {
 function atualizarGrafico(contagem) {
   const ctx = document.getElementById("graficoStatus").getContext("2d");
   if (grafico) grafico.destroy();
+
+  const isDark = document.body.classList.contains("dark");
 
   grafico = new Chart(ctx, {
     type: 'bar',
@@ -87,7 +103,7 @@ function atualizarGrafico(contagem) {
         datalabels: {
           anchor: 'end',
           align: 'start',
-          color: '#333',
+          color: isDark ? '#eee' : '#333',
           font: { weight: 'bold', size: 14 },
           formatter: value => value > 0 ? value : ''
         }
@@ -95,10 +111,11 @@ function atualizarGrafico(contagem) {
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { stepSize: 1 },
-          grid: { color: "rgba(0, 0, 0, 0.05)" }
+          ticks: { stepSize: 1, color: isDark ? '#ccc' : '#333' },
+          grid: { color: isDark ? '#444' : "rgba(0, 0, 0, 0.05)" }
         },
         x: {
+          ticks: { color: isDark ? '#ccc' : '#333' },
           grid: { display: false }
         }
       }
@@ -111,11 +128,81 @@ document.addEventListener("DOMContentLoaded", () => {
   carregarTarefas();
 
   document.querySelectorAll(".filtro").forEach(btn =>
-    btn.addEventListener("click", () =>
-      renderTarefas(btn.dataset.status)
-    )
+    btn.addEventListener("click", () => {
+      ultimoFiltro = btn.dataset.status;
+      renderTarefas(ultimoFiltro);
+    })
   );
 
   document.getElementById("limparFiltro")
-    .addEventListener("click", () => renderTarefas("todos"));
+    .addEventListener("click", () => {
+      ultimoFiltro = "todos";
+      renderTarefas(ultimoFiltro);
+    });
+
+  document.getElementById("campoBusca")
+    .addEventListener("input", () => renderTarefas(ultimoFiltro));
+
+  // Dark mode toggle
+  const toggleBtn = document.getElementById("toggleDarkMode");
+  const body = document.body;
+  const icon = toggleBtn.querySelector("i");
+
+  if (localStorage.getItem("modo") === "dark") {
+    body.classList.add("dark");
+    icon.classList.replace("fa-moon", "fa-sun");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    body.classList.toggle("dark");
+    const darkAtivo = body.classList.contains("dark");
+    icon.classList.toggle("fa-moon", !darkAtivo);
+    icon.classList.toggle("fa-sun", darkAtivo);
+    localStorage.setItem("modo", darkAtivo ? "dark" : "light");
+    atualizarGrafico(ultimaContagem);
+  });
+
+  // Ordenação com setinhas visuais
+  const ths = document.querySelectorAll("th");
+  const chaves = ["Tarefa", "Data de Início", "Data de Término", "Status"];
+
+  ths.forEach((th, index) => {
+    th.style.cursor = "pointer";
+
+    const seta = document.createElement("span");
+    seta.classList.add("seta");
+    seta.style.marginLeft = "6px";
+    th.appendChild(seta);
+
+    th.addEventListener("click", () => {
+      const crescente = ordemAtual.coluna === index ? !ordemAtual.crescente : true;
+      ordemAtual = { coluna: index, crescente };
+
+      ths.forEach((outro, i) => {
+        const icone = outro.querySelector(".seta");
+        if (icone) icone.textContent = i === index ? (crescente ? "↑" : "↓") : "";
+      });
+
+      const chave = chaves[index];
+
+      todasTarefas.sort((a, b) => {
+        const valA = a[chave] || "";
+        const valB = b[chave] || "";
+
+        const isData = chave.includes("Data");
+        const dataA = isData ? parseDataBR(valA) : valA;
+        const dataB = isData ? parseDataBR(valB) : valB;
+
+        if (isData) {
+          return crescente ? dataA - dataB : dataB - dataA;
+        }
+
+        return crescente
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      });
+
+      renderTarefas(ultimoFiltro);
+    });
+  });
 });
